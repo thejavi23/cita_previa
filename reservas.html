@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservar cita</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 22px; }
+  label { display:block; margin-top:14px; font-weight:bold; font-size:14px; }
+  input, select { width:100%; padding:8px; margin-top:4px; box-sizing:border-box; font-size:15px; }
+  button { margin-top:20px; width:100%; padding:12px; background:#1F3A5F; color:#fff; border:none; border-radius:4px; font-size:16px; cursor:pointer; }
+  #mensaje { margin-top:16px; font-weight:bold; }
+</style>
+</head>
+<body>
+<h1>Reservar cita</h1>
+<form id="formReserva">
+  <label>Nombre y apellidos</label>
+  <input type="text" id="nombre" required>
+  <label>Telefono (9 digitos)</label>
+  <input type="tel" id="telefono" required pattern="[0-9]{9}">
+  <label>Matricula / Referencia</label>
+  <input type="text" id="matricula" required>
+  <label>Servicio</label>
+  <select id="servicio" required></select>
+  <label>Fecha</label>
+  <input type="date" id="fecha" required>
+  <label>Hora</label>
+  <select id="hora" required></select>
+  <button type="submit">Reservar</button>
+</form>
+<div id="mensaje"></div>
+ 
+<script>
+  const SUPABASE_URL = https://ggnjqjwasybbhosnjomk.supabase.co/rest/v1/;
+  const SUPABASE_ANON_KEY = sb_publishable_cLZ44Bj1DDz6gfFn1LEcqQ_w08vUwNh;
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+ 
+  async function cargarServicios() {
+    const { data, error } = await client.from('SERVICIO').select('id, nombre, precio, duracion');
+    const select = document.getElementById('servicio');
+    if (error || !data) { select.innerHTML = '<option value="">No se pudieron cargar los servicios</option>'; return; }
+    select.innerHTML = data.map(s => '<option value="' + s.id + '">' + s.nombre + ' - ' + s.precio + 'EUR (' + (s.duracion || 60) + ' min)</option>').join('');
+  }
+ 
+  async function cargarHoras() {
+    const { data } = await client.from('horario_publico').select('*').single();
+    const select = document.getElementById('hora');
+    const inicio = data ? data.horario_inicio : 8;
+    const fin = data ? data.horario_fin : 20;
+    let opciones = '';
+    for (let m = inicio * 60; m < fin * 60; m += 30) {
+      const hh = String(Math.floor(m / 60)).padStart(2, '0');
+      const mm = String(m % 60).padStart(2, '0');
+      opciones += '<option value="' + hh + ':' + mm + '">' + hh + ':' + mm + '</option>';
+    }
+    select.innerHTML = opciones;
+}
+ 
+  cargarServicios();
+  cargarHoras();
+ 
+  document.getElementById('formReserva').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const mensaje = document.getElementById('mensaje');
+    mensaje.style.color = '#222';
+    mensaje.textContent = 'Enviando...';
+ 
+    const nombre = document.getElementById('nombre').value.trim();
+    const telefono = document.getElementById('telefono').value.trim();
+    const matricula = document.getElementById('matricula').value.trim().toUpperCase();
+    const servicioId = document.getElementById('servicio').value;
+    const fecha = document.getElementById('fecha').value;
+    const hora = document.getElementById('hora').value;
+    const fechaHora = fecha + ' ' + hora + ':00';
+ 
+    const { error } = await client.from('CITAS').insert([{
+      nombre_cliente: nombre,
+      telefono: telefono,
+      matricula: matricula,
+      servicio_id: servicioId,
+      fecha_hora: fechaHora
+    }]);
+ 
+    if (error) {
+      mensaje.style.color = '#B02A2A';
+      mensaje.textContent = 'No hay disponibilidad para esa hora. Prueba con otra franja.';
+    } else {
+      mensaje.style.color = '#2E7D32';
+      mensaje.textContent = 'Cita reservada correctamente!';
+      document.getElementById('formReserva').reset();
+    }
+  });
+</script>
+</body>
+</html>
